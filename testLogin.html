@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de Registro y Login con Supabase</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            cursor: pointer;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            min-height: 100px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #eee;
+        }
+        .tab.active {
+            background-color: #ddd;
+        }
+        .form {
+            display: none;
+        }
+        .form.active {
+            display: block;
+        }
+    </style>
+    <!-- Añadir Supabase JS Client ANTES de usar -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Test de Supabase Auth</h1>
+    <p>Este formulario prueba la conexión directa con Supabase sin usar la lógica de la aplicación principal.</p>
+    
+    <div class="tabs">
+        <div class="tab active" data-form="register">Registro</div>
+        <div class="tab" data-form="login">Login</div>
+    </div>
+
+    <div id="registerForm" class="form active">
+        <h2>Registro de Usuario Simple</h2>
+        <div class="form-group">
+            <label for="regEmail">Email:</label>
+            <input type="email" id="regEmail" required>
+        </div>
+        <div class="form-group">
+            <label for="regPassword">Contraseña:</label>
+            <input type="password" id="regPassword" required>
+        </div>
+        <div class="form-group">
+            <label for="regName">Nombre:</label>
+            <input type="text" id="regName" required>
+        </div>
+        <div class="form-group">
+            <label for="regRole">Rol:</label>
+            <select id="regRole">
+                <option value="user">Usuario Normal</option>
+                <option value="admin">Administrador</option>
+            </select>
+        </div>
+        <button id="registerBtn">Registrar</button>
+    </div>
+
+    <div id="loginForm" class="form">
+        <h2>Login</h2>
+        <div class="form-group">
+            <label for="loginEmail">Email:</label>
+            <input type="email" id="loginEmail" required>
+        </div>
+        <div class="form-group">
+            <label for="loginPassword">Contraseña:</label>
+            <input type="password" id="loginPassword" required>
+        </div>
+        <button id="loginBtn">Iniciar Sesión</button>
+    </div>
+
+    <div class="result">
+        <h3>Resultado:</h3>
+        <pre id="resultOutput"></pre>
+    </div>
+    
+    <script>
+        // Elementos DOM
+        const resultOutput = document.getElementById('resultOutput');
+        const tabs = document.querySelectorAll('.tab');
+        const forms = document.querySelectorAll('.form');
+        const registerBtn = document.getElementById('registerBtn');
+        const loginBtn = document.getElementById('loginBtn');
+
+        // Configuración de Supabase
+        const supabaseUrl = 'https://thagtirdkvmhxawmlxxv.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoYWd0aXJka3ZtaHhhd21seHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIwOTk3ODMsImV4cCI6MjA1NzY3NTc4M30.q7KQMtSRWfjod_BKoCQQSDJswjoYe8RLeE4LQCfIDjg';
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Cambio de tabs
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const formId = tab.getAttribute('data-form');
+                
+                // Activar tab
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Mostrar formulario
+                forms.forEach(form => form.classList.remove('active'));
+                document.getElementById(`${formId}Form`).classList.add('active');
+            });
+        });
+
+        // Mostrar resultados
+        function showResult(title, data) {
+            resultOutput.innerHTML = `<strong>${title}</strong>\n${JSON.stringify(data, null, 2)}`;
+        }
+
+        // Función de registro
+        registerBtn.addEventListener('click', async () => {
+            try {
+                const email = document.getElementById('regEmail').value;
+                const password = document.getElementById('regPassword').value;
+                const name = document.getElementById('regName').value;
+                const role = document.getElementById('regRole').value;
+
+                if (!email || !password || !name) {
+                    showResult('Error', { message: 'Todos los campos son obligatorios' });
+                    return;
+                }
+
+                // 1. Registrar en Supabase Auth
+                resultOutput.innerHTML = 'Registrando usuario...';
+                const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            name,
+                            role
+                        }
+                    }
+                });
+
+                if (authError) {
+                    showResult('Error en Auth', authError);
+                    return;
+                }
+
+                showResult('Usuario creado en Auth', { 
+                    id: authData.user.id,
+                    email: authData.user.email,
+                    metadata: authData.user.user_metadata
+                });
+
+                // 2. Crear entrada en tabla users usando create_user
+                resultOutput.innerHTML += '\n\nCreando registro en tabla users...';
+                const { data: userData, error: userError } = await supabaseClient.rpc('create_user', {
+                    p_auth_user_id: authData.user.id,
+                    p_name: name,
+                    p_role: role,
+                    p_team_code: null
+                });
+
+                if (userError) {
+                    showResult('Usuario creado en Auth pero error en tabla users', userError);
+                    return;
+                }
+
+                showResult('¡Registro exitoso!', { 
+                    auth: { 
+                        id: authData.user.id,
+                        email: authData.user.email
+                    },
+                    profile: userData
+                });
+
+            } catch (error) {
+                showResult('Error', error);
+            }
+        });
+
+        // Función de login
+        loginBtn.addEventListener('click', async () => {
+            try {
+                const email = document.getElementById('loginEmail').value;
+                const password = document.getElementById('loginPassword').value;
+
+                if (!email || !password) {
+                    showResult('Error', { message: 'Email y contraseña son obligatorios' });
+                    return;
+                }
+
+                resultOutput.innerHTML = 'Iniciando sesión...';
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (error) {
+                    showResult('Error de login', error);
+                    return;
+                }
+
+                // Usar la función RPC get_user_profile en lugar de consultar directamente la tabla users
+                const { data: userData, error: userError } = await supabaseClient
+                    .rpc('get_user_profile', {
+                        p_auth_user_id: data.user.id
+                    });
+
+                if (userError) {
+                    showResult('Login exitoso pero error al obtener perfil', userError);
+                    return;
+                }
+
+                showResult('Login exitoso', {
+                    session: { 
+                        token: data.session.access_token.substring(0, 10) + '...',
+                        expires: new Date(data.session.expires_at * 1000).toLocaleString()
+                    },
+                    user: {
+                        id: data.user.id,
+                        email: data.user.email,
+                        profile: userData
+                    }
+                });
+            } catch (error) {
+                showResult('Error', error);
+            }
+        });
+    </script>
+</body>
+</html> 

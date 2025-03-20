@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Simple de Conexión a Supabase</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .result {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Simple de Conexión a Supabase</h1>
+    <p>Esta página es solo para verificar la conexión con Supabase.</p>
+
+    <div>
+        <button id="testURL">Probar URL del Proyecto</button>
+        <button id="testConnection">Probar Conexión</button>
+        <button id="clearResults">Limpiar Resultados</button>
+    </div>
+
+    <div class="result">
+        <h3>Resultado:</h3>
+        <pre id="resultOutput">Los resultados aparecerán aquí...</pre>
+    </div>
+
+    <script>
+        // Elementos DOM
+        const resultOutput = document.getElementById('resultOutput');
+        const testURLBtn = document.getElementById('testURL');
+        const testConnectionBtn = document.getElementById('testConnection');
+        const clearResultsBtn = document.getElementById('clearResults');
+
+        // Configuración de Supabase
+        const supabaseUrl = 'https://thagtirdkvmhxawmlxxv.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoYWd0aXJka3ZtaHhhd21seHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIwOTk3ODMsImV4cCI6MjA1NzY3NTc4M30.q7KQMtSRWfjod_BKoCQQSDJswjoYe8RLeE4LQCfIDjg';
+
+        // Funciones
+        function logResult(title, data) {
+            const content = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+            resultOutput.innerHTML = `<strong>${title}</strong>\n${content}`;
+        }
+
+        function appendResult(title, data) {
+            const content = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+            resultOutput.innerHTML += `\n\n<strong>${title}</strong>\n${content}`;
+        }
+
+        // Probar URL del proyecto
+        testURLBtn.addEventListener('click', async () => {
+            try {
+                logResult('Probando URL', 'Intentando acceder a ' + supabaseUrl);
+                
+                const startTime = new Date().getTime();
+                const response = await fetch(supabaseUrl, {
+                    method: 'GET',
+                    mode: 'no-cors' // Necesario para dominios cruzados
+                });
+                const endTime = new Date().getTime();
+                
+                const timeElapsed = endTime - startTime;
+                
+                appendResult('Resultado', `Conexión exitosa. Tiempo: ${timeElapsed}ms`);
+            } catch (error) {
+                appendResult('Error', error.message);
+                
+                // Probar dominio principal de Supabase
+                try {
+                    appendResult('Probando dominio principal', 'Intentando acceder a https://supabase.com');
+                    
+                    const altResponse = await fetch('https://supabase.com', {
+                        method: 'GET',
+                        mode: 'no-cors'
+                    });
+                    
+                    appendResult('Dominio principal', 'Conexión exitosa a supabase.com');
+                    appendResult('Diagnóstico', 'El problema parece ser específico con la URL de tu proyecto');
+                } catch (altError) {
+                    appendResult('Error en dominio principal', altError.message);
+                    appendResult('Diagnóstico', 'Parece haber un problema general con tu conexión a Internet');
+                }
+            }
+        });
+
+        // Probar conexión con inicialización de cliente Supabase
+        testConnectionBtn.addEventListener('click', async () => {
+            try {
+                if (!window.supabase) {
+                    logResult('Cargando cliente Supabase', 'Espera un momento...');
+                    
+                    // Cargar el cliente de Supabase dinámicamente
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+                    document.head.appendChild(script);
+                    
+                    await new Promise(resolve => {
+                        script.onload = resolve;
+                        script.onerror = () => {
+                            appendResult('Error', 'No se pudo cargar el cliente de Supabase');
+                            resolve();
+                        };
+                    });
+                }
+
+                if (!window.supabase) {
+                    throw new Error('No se pudo cargar el cliente de Supabase');
+                }
+
+                logResult('Inicializando cliente Supabase', {
+                    url: supabaseUrl,
+                    key: supabaseKey.substring(0, 15) + '...'
+                });
+
+                const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+                
+                appendResult('Cliente creado', 'El cliente de Supabase se ha inicializado correctamente');
+                
+                // Probar una operación simple: verificar la hora del servidor
+                appendResult('Probando API', 'Consultando la hora del servidor...');
+                
+                try {
+                    const { data, error } = await supabase.rpc('get_timestamp');
+                    
+                    if (error) {
+                        throw error;
+                    }
+                    
+                    appendResult('Respuesta del servidor', data);
+                    appendResult('Diagnóstico', '✅ La conexión con Supabase funciona correctamente');
+                } catch (rpcError) {
+                    // Si falla la función RPC, intentamos una consulta simple
+                    appendResult('Error en RPC', rpcError.message);
+                    appendResult('Intentando consulta alternativa', 'Consultando la versión...');
+                    
+                    try {
+                        const { data, error } = await supabase.from('_version').select('*').limit(1);
+                        
+                        if (error) {
+                            throw error;
+                        }
+                        
+                        appendResult('Respuesta del servidor', data);
+                        appendResult('Diagnóstico', '✅ La conexión con Supabase funciona correctamente');
+                    } catch (queryError) {
+                        appendResult('Error en consulta', queryError.message);
+                        appendResult('Diagnóstico', '❌ No se pudo establecer comunicación con el API de Supabase');
+                    }
+                }
+            } catch (error) {
+                appendResult('Error general', error.message);
+                appendResult('Recomendación', 'Verifica la URL y clave de tu proyecto en Supabase. Es posible que el proyecto ya no exista o haya sido renombrado.');
+            }
+        });
+
+        // Limpiar resultados
+        clearResultsBtn.addEventListener('click', () => {
+            resultOutput.innerHTML = 'Los resultados aparecerán aquí...';
+        });
+    </script>
+</body>
+</html> 
